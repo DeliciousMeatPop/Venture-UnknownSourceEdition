@@ -101,6 +101,9 @@ jobs:
 
   publish:
     needs: [windows, linux]
+    # Stated explicitly: the optional upstream-confirm job above is skipped when upstream has nothing newer,
+    # and a skipped job anywhere in the chain would otherwise skip this one too.
+    if: ${{ !cancelled() && needs.windows.result == 'success' && needs.linux.result == 'success' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
