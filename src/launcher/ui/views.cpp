@@ -210,7 +210,7 @@ void description(std::string_view raw, float width) {
 }
 
 // The community server, for help and news.
-constexpr const char* kDiscord = "https://discord.gg/Ey9hHszvwa";
+constexpr const char* kProjectUrl = "https://github.com/DeliciousMeatPop/Venture-UnknownSourceEdition";
 
 // A modal dialog in the house style; returns true while open. Every dialog is
 // a title, a short message, optional settings-style rows, and dialog_footer().
@@ -400,6 +400,7 @@ void App::draw() {
   draw_save_import();
   draw_save_export();
   draw_store_link();
+  draw_dev_identity_prompt();
   draw_cancel_download();
   draw_report();
   draw_update();
@@ -891,7 +892,7 @@ void App::draw_library() {
         if (clicked && over) {
           clicked = false;
           if (can_play)
-            action([&] { play(g); });
+            action([&] { play_or_ask(g); });
           else
             action([&] { install_for_owner(g); });
         }
@@ -1096,6 +1097,10 @@ void App::draw_game_page() {
       badge("Paused", color::text2, color::surface_hi);
     else
       badge("Not installed", color::text2, color::surface_hi, icons::cloud);
+    if (dev_identity(g.id)) {
+      ImGui::SameLine(0, s(6));
+      badge("DEV IDENTITY", color::warning, color::alpha(color::warning, 0.14f), icons::warning);
+    }
     if (update) {
       ImGui::SameLine(0, s(6));
       badge("Update available", color::accent_text, color::accent_wash, icons::update);
@@ -1162,7 +1167,7 @@ void App::draw_game_page() {
                    Tone::secondary, cta, !r.quitting && armed))
           r.quitting = r.process.request_stop();
       } else if (button("Play##play", icons::play, Tone::primary, cta)) {
-        action([&] { play(g); });
+        action([&] { play_or_ask(g); });
       }
       draw_tools();
       if (update) {
@@ -1256,6 +1261,17 @@ void App::draw_game_page() {
           if (menu_item(in ? "Remove from Steam" : "Add to Steam", 0, false, true,
                         ImTextureID(reinterpret_cast<uintptr_t>(steam_logo(int(std::round(s(16))))))))
             action([&] { set_in_steam(g.id, !in); });
+        }
+        // Dev builds and other-store apps: a local developer identity instead of a
+        // Meta account. Per game and off by default; a package with a "dev"
+        // namespace segment only gets the item worded as a suggestion.
+        if (tools && partial) {
+          const bool dev = dev_identity(g.id);
+          const bool hint = !dev && suggests_dev_identity(partial->plan.package);
+          if (menu_item(dev ? "Turn off dev identity"
+                            : hint ? "Use dev identity (looks like a dev build)" : "Use dev identity",
+                        0, false, !running))
+            action([&] { set_dev_identity(g.id, !dev); });
         }
         // The game's data for the account it plays as: its private storage, where
         // saves live, and its shared storage (Android/data/<package>, in
@@ -1988,7 +2004,7 @@ void App::draw_settings() {
           save_settings();
         });
     }, [&] {
-      if (icon_button("passthrough-help", icons::info, "Mixed reality setups (opens the Venture wiki)", kHelpIcon))
+      if (icon_button("passthrough-help", icons::info, "Mixed reality setups (opens the upstream Venture wiki)", kHelpIcon))
         action([] { open_url("https://github.com/Villagers654/Venture/wiki/Mixed-Reality"); });
     });
     if (settings_.passthrough && settings_.color_key) {
@@ -2163,12 +2179,11 @@ void App::draw_settings() {
     draw_text(adl, fonts().semibold, kBody, {tx, text_y(fonts().semibold, kBody, cy - s(10))}, color::text, "Venture");
     draw_text(adl, fonts().regular, kSmall, {tx, text_y(fonts().regular, kSmall, cy + s(10))}, color::text2,
               "Version " VENTURE_VERSION);
-    float bw = row_button_w("Join our Discord", icons::people);
+    float bw = row_button_w("Project on GitHub", icons::people);
     ImGui::Dummy({m, m});
     ImGui::SetCursorScreenPos({p.x + ImGui::GetContentRegionAvail().x - bw, cy - s(19)});
-    if (button("Join our Discord##discord", icons::people, Tone::secondary, {bw, s(38)}, true,
-               ImTextureID(reinterpret_cast<uintptr_t>(discord_logo(int(std::round(s(16))))))))
-      action([] { open_url(kDiscord); });
+    if (button("Project on GitHub##project", icons::people, Tone::secondary, {bw, s(38)}))
+      action([] { open_url(kProjectUrl); });
     ImGui::SetCursorScreenPos({p.x, p.y + m});
     ImGui::Dummy({0, 0});
   }
@@ -3708,6 +3723,35 @@ void App::draw_store_link() {
   }
 }
 
+void App::play_or_ask(const meta::Game& g) {
+  if (should_ask_dev_identity(g.id))
+    dev_ask_target_ = g.id;
+  else
+    play(g);
+}
+
+void App::draw_dev_identity_prompt() {
+  if (!dev_ask_target_.empty() && !ImGui::IsPopupOpen("Use dev identity?")) ImGui::OpenPopup("Use dev identity?");
+  if (begin_dialog("Use dev identity?", 500)) {
+    const auto* install = installed(dev_ask_target_, false);
+    dialog_text("Use dev identity?",
+                "This looks like a dev build. With dev identity it starts as a local developer user, with no Meta "
+                "account and no ownership check. Without it, it uses your Meta account as any store game does. You "
+                "can change this later in the game's menu.");
+    const int clicked = dialog_footer({{"Cancel"}, {"Use my Meta account"}, {"Use dev identity", Tone::primary}});
+    if (clicked >= 0 || !install || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      const auto id = std::exchange(dev_ask_target_, {});
+      if (clicked == 1 || clicked == 2) {
+        action([&] { answer_dev_identity(id, clicked == 2); });
+        if (const auto* game = this->game(meta::base_app(id)))
+          action([&] { play(*game); });
+      }
+      ImGui::CloseCurrentPopup();
+    }
+    end_dialog();
+  }
+}
+
 void App::draw_cancel_download() {
   if (cancel_target_ && !ImGui::IsPopupOpen("Cancel download?")) ImGui::OpenPopup("Cancel download?");
   if (begin_dialog("Cancel download?", 460)) {
@@ -3773,7 +3817,7 @@ void App::check_update() {
     return [this, tag, url, release] {
       const std::string version = tag.starts_with('v') ? tag.substr(1) : tag;
       if (!newer_version(tag, VENTURE_VERSION) || version == settings_.dismissed_update ||
-          !url.starts_with("https://github.com/Villagers654/Venture/releases/"))
+          !url.starts_with("https://github.com/" + std::string(http::kReleaseRepo) + "/releases/"))
         return;
       log::info("launcher", "Venture {} is available", version);
       update_ = Update{version, url};
