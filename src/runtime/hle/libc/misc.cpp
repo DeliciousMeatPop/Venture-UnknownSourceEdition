@@ -68,6 +68,11 @@ const std::map<std::string, Property>& properties() {
         // may supply the installed firmware's value through ProcessConfig.
         {"ro.build.fingerprint", "oculus/" + std::string(device.device) + "/" +
                                      std::string(device.device) + ":12/Venture/0:user/release-keys"}};
+    // A device-setting override of a base product field also applies to every partition's copy.
+    for (auto field : {"manufacturer", "model", "brand", "device", "name"})
+      if (auto it = process_config().properties.find("ro.product." + std::string(field));
+          it != process_config().properties.end())
+        defaults["ro.product." + std::string(field)] = it->second;
     for (auto partition : {"system", "system_ext", "product", "vendor", "odm", "bootimage"})
       for (auto field : {"manufacturer", "model", "brand", "device", "name"})
         defaults["ro.product." + std::string(partition) + "." + field] =

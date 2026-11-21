@@ -7,6 +7,7 @@
 #include "launcher/core.h"
 #include "launcher/i18n/i18n.h"
 #include "launcher/ui/rich_text.h"
+#include "core/device_identity.h"
 
 #include <algorithm>
 #include <chrono>
@@ -60,7 +61,11 @@ Library
   play GAME [--as ACCOUNT|local] [--dev-identity|--no-dev-identity]
                                  Launch a game and wait for it to exit. --dev-identity
                                  (saved per game) uses a local developer user instead of
-                                 a Meta account, for dev builds and other-store apps
+                                 a Meta account, for dev builds and other-store apps.
+                                 Experimental: --device auto|quest|quest2|questpro|quest3
+                                 picks the headset the game sees; --device-prop
+                                 "ro.product.model=X;ro.product.manufacturer=Y" (or none)
+                                 overrides its product identity. Both are saved per game
   logs GAME [--lines N]          The end of a game's last runtime log
   report [GAME] [--upload]       Write a debug report about a game's last run
                                  (the most recent one by default): what happened,
@@ -142,7 +147,7 @@ struct Args {
 
 Args parse(const std::vector<std::string> &argv) {
   static const std::set<std::string> with_value{"--as",   "--to",   "--search", "--serial",
-                                                "--lines", "--only", "--from",   "--build", "--language"};
+                                                "--lines", "--only", "--from",   "--build", "--language", "--device", "--device-prop"};
   static const std::set<std::string> known{"--json",   "--offline", "--yes",          "-y",
                                            "--all",    "--installed", "--delete-saves", "--headset",
                                            "--help",   "-h",        "--version",      "--manual",
@@ -920,6 +925,34 @@ int Cli::play_game(const Args &args) {
     throw UsageError("Give --dev-identity or --no-dev-identity, not both.");
   if (args.flag("--dev-identity") || args.flag("--no-dev-identity"))
     set_dev_identity(g.id, args.flag("--dev-identity"));
+  if (auto device = args.value("--device")) {
+    const auto name = lower(*device);
+    if (name == "auto")
+      set_device_preset(g.id, {});
+    else if (name == "quest" || name == "quest2" || name == "questpro" || name == "quest3")
+      set_device_preset(g.id, name);
+    else
+      throw UsageError(trf("Unknown device {0}. Use auto, quest, quest2, questpro or quest3.", *device));
+  }
+  if (auto props = args.value("--device-prop")) {
+    std::map<std::string, std::string> parsed;
+    if (lower(*props) != "none") {
+      size_t at = 0;
+      while (at <= props->size()) {
+        auto end = props->find(';', at);
+        if (end == std::string::npos) end = props->size();
+        const auto item = props->substr(at, end - at);
+        const auto eq = item.find('=');
+        if (eq == std::string::npos || !valid_device_property(item.substr(0, eq), item.substr(eq + 1)))
+          throw UsageError(trf("Device property not allowed: {0}. Only ro.product.* names (not the CPU ABI), "
+                               "ro.hardware, ro.build.fingerprint and ro.build.product, with values of 1 to 128 "
+                               "printable characters and no semicolons.", item));
+        parsed[item.substr(0, eq)] = item.substr(eq + 1);
+        at = end + 1;
+      }
+    }
+    set_device_props(g.id, std::move(parsed));
+  }
   std::string key = play_key(g.id);
   if (auto as = args.value("--as"))
     key = resolve_account(*as, true);

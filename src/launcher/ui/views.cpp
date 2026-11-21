@@ -1273,6 +1273,19 @@ void App::draw_game_page() {
                         0, false, !running))
             action([&] { set_dev_identity(g.id, !dev); });
         }
+        // Experimental: the headset the game sees. Each click moves to the next model; Auto follows the
+        // APK's manifest. Custom product strings are set with venture-cli play --device-prop.
+        if (tools && partial) {
+          static constexpr const char *kModels[] = {"", "quest", "quest2", "questpro", "quest3"};
+          static constexpr const char *kNames[] = {"Auto", "Quest", "Quest 2", "Quest Pro", "Quest 3"};
+          const auto current = device_preset(g.id);
+          size_t at = 0;
+          for (size_t i = 0; i < std::size(kModels); ++i)
+            if (current == kModels[i]) at = i;
+          const std::string label = std::string("Device: ") + kNames[at] + " (click to change)";
+          if (menu_item(label.c_str(), 0, false, !running))
+            action([&] { set_device_preset(g.id, kModels[(at + 1) % std::size(kModels)]); });
+        }
         // The game's data for the account it plays as: its private storage, where
         // saves live, and its shared storage (Android/data/<package>, in
         // external-data), where homebrew ports look for the game data the player

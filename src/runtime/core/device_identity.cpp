@@ -1,5 +1,6 @@
 #include "core/device_identity.h"
 #include <array>
+#include <cctype>
 #include <stdexcept>
 #include <vector>
 
@@ -49,6 +50,12 @@ const DeviceIdentity& select_device_identity(std::string_view supported) {
   for (auto i = devices.rbegin(); i != devices.rend(); ++i)
     if (lists(*i)) return *i;
   return devices.front();
+}
+
+const DeviceIdentity* find_device_identity(std::string_view name) {
+  for (const auto& device : devices)
+    if (device.manifest_name == name) return &device;
+  return nullptr;
 }
 
 std::string manifest_supported_devices(std::span<const std::byte> xml) {

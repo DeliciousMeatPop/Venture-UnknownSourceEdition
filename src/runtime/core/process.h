@@ -66,6 +66,15 @@ struct ProcessConfig {
 };
 
 ProcessConfig& process_config();
+// Experimental: what the guest sees as its headset. Set before configure_game, which consumes it (the
+// config is reset there). `preset` is a built-in model (quest, quest2, questpro, quest3) used instead of the
+// one the APK's manifest selects; empty keeps the automatic choice. `properties` override guest system
+// properties (see valid_device_property).
+struct DeviceOverrides {
+  std::string preset;
+  std::map<std::string, std::string> properties;
+};
+void set_device_overrides(DeviceOverrides overrides);
 std::uint64_t guest_physical_memory(); // bytes, selected Quest device profile
 std::uint64_t guest_usable_memory(); // profile RAM bounded by admitted guest backing
 

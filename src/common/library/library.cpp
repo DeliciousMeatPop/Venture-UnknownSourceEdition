@@ -865,6 +865,16 @@ Settings Settings::load(const fs::path &data) {
     for (const auto &id : asked)
       if (id.is_string() && !id.get<std::string>().empty() && id.get<std::string>().size() <= 64)
         s.dev_identity_asked.insert(id.get<std::string>());
+  if (const auto &presets = field(j, "devicePreset"); presets.is_object())
+    for (const auto &[id, value] : presets.items())
+      if (value.is_string() && id.size() <= 64 && value.get<std::string>().size() <= 16)
+        s.device_preset[id] = value.get<std::string>();
+  if (const auto &all = field(j, "deviceProps"); all.is_object())
+    for (const auto &[id, props] : all.items())
+      if (props.is_object() && id.size() <= 64)
+        for (const auto &[name, value] : props.items())
+          if (value.is_string() && name.size() <= 80 && value.get<std::string>().size() <= 128)
+            s.device_props[id][name] = value.get<std::string>();
   if (const auto &hidden = field(j, "hiddenGames"); hidden.is_array())
     for (const auto &id : hidden)
       if (id.is_string() && !id.get<std::string>().empty() && id.get<std::string>().size() <= 64)
@@ -901,6 +911,8 @@ void Settings::save(const fs::path &data) const {
          {"steamSkip", steam_skip},
          {"devIdentity", dev_identity},
          {"devIdentityAsked", dev_identity_asked},
+         {"devicePreset", device_preset},
+         {"deviceProps", device_props},
          {"hiddenGames", hidden},
          {"showHiddenGames", show_hidden},
          {"libraryInstalledOnly", installed_only}};

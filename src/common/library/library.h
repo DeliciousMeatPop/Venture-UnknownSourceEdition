@@ -126,6 +126,11 @@ struct Settings {
   // Apps the launcher already asked about dev identity (either answer), so the
   // prompt shows once per app.
   std::set<std::string> dev_identity_asked;
+  // Experimental device presentation, per app (by app id): which built-in headset model the game sees
+  // (quest, quest2, questpro, quest3; absent follows the APK's manifest) and guest system property
+  // overrides (NAME to VALUE). Off by default.
+  std::map<std::string, std::string> device_preset;
+  std::map<std::string, std::map<std::string, std::string>> device_props;
   // Library entries the player hid (by library id): a view filter only. A
   // hidden game stays installed, launchable and in Steam; the library lists it
   // again while show_hidden is on (the library's "Show hidden" toggle).

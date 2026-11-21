@@ -69,3 +69,37 @@ TEST_CASE("APK identity metadata accepts both Android string pool encodings and 
   }
   CHECK_THROWS(venture::manifest_supported_devices({}));
 }
+
+TEST_CASE("a built-in model can be named directly") {
+  using venture::find_device_identity;
+  REQUIRE(find_device_identity("quest2"));
+  CHECK(find_device_identity("quest2")->model == "Quest 2");
+  CHECK(find_device_identity("quest3") == &venture::native_device_identity());
+  CHECK(find_device_identity("questpro")->device == "seacliff");
+  CHECK(find_device_identity("") == nullptr);
+  CHECK(find_device_identity("pico4") == nullptr);
+  CHECK(find_device_identity("Quest 2") == nullptr);
+}
+
+TEST_CASE("device property overrides are limited to product identity strings") {
+  using venture::valid_device_property;
+  CHECK(valid_device_property("ro.product.manufacturer", "PICO"));
+  CHECK(valid_device_property("ro.product.model", "Some Model 4"));
+  CHECK(valid_device_property("ro.product.system.device", "example"));
+  CHECK(valid_device_property("ro.hardware", "example"));
+  CHECK(valid_device_property("ro.build.fingerprint", "brand/device/device:12/Build/0:user/release-keys"));
+  // Not product identity: SDK level, security flags and the CPU ABI stay Venture's.
+  CHECK_FALSE(valid_device_property("ro.build.version.sdk", "35"));
+  CHECK_FALSE(valid_device_property("ro.debuggable", "1"));
+  CHECK_FALSE(valid_device_property("ro.secure", "0"));
+  CHECK_FALSE(valid_device_property("ro.product.cpu.abi", "x86_64"));
+  CHECK_FALSE(valid_device_property("ro.product.cpu.abilist", "x86_64"));
+  // Malformed names and values.
+  CHECK_FALSE(valid_device_property("", "x"));
+  CHECK_FALSE(valid_device_property("ro.product.model", ""));
+  CHECK_FALSE(valid_device_property("ro.product.model", "a;b"));
+  CHECK_FALSE(valid_device_property("ro.product.model", "line\nbreak"));
+  CHECK_FALSE(valid_device_property("ro.product.model", std::string(129, 'a')));
+  CHECK(valid_device_property("ro.product.model", std::string(128, 'a')));
+  CHECK_FALSE(valid_device_property("ro.product.mo del", "x"));
+}

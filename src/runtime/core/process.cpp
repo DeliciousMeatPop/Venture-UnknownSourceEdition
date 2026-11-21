@@ -44,6 +44,16 @@ std::uint64_t guest_usable_memory() {
 }
 ProcessConfig& process_config() { static ProcessConfig config; return config; }
 namespace {
+DeviceOverrides pending_device_overrides;
+}
+void set_device_overrides(DeviceOverrides overrides) {
+  if (!overrides.preset.empty() && !find_device_identity(overrides.preset))
+    throw std::runtime_error("unknown device preset: " + overrides.preset);
+  for (const auto& [name, value] : overrides.properties)
+    if (!valid_device_property(name, value)) throw std::runtime_error("device property not allowed: " + name);
+  pending_device_overrides = std::move(overrides);
+}
+namespace {
 std::optional<GuestIsa> frozen_isa;
 bool below(std::string_view path, std::string_view prefix) {
   return path == prefix || (path.starts_with(prefix) && path.size() > prefix.size() && path[prefix.size()] == '/');
@@ -100,7 +110,7 @@ void configure_game(const std::filesystem::path& install,
   mz_zip_archive zip{};
   if (!mz_zip_reader_init_file(&zip, paths::utf8(paths::io_path(config.apk)).c_str(), 0)) throw std::runtime_error("cannot open APK ZIP");
   struct End { mz_zip_archive* zip; ~End() { mz_zip_reader_end(zip); } } end{&zip};
-  bool a64 = false, a32 = false;
+  bool a64 = false, a32 = false, vendor_loaders = false;
   for (mz_uint i = 0; i < mz_zip_reader_get_num_files(&zip); ++i) {
     mz_zip_archive_file_stat entry{};
     if (!mz_zip_reader_file_stat(&zip, i, &entry)) throw std::runtime_error("invalid APK ZIP entry");
@@ -108,6 +118,7 @@ void configure_game(const std::filesystem::path& install,
     if (!member.ends_with(".so")) continue;
     a64 |= member.starts_with("lib/arm64-v8a/");
     a32 |= member.starts_with("lib/armeabi-v7a/");
+    vendor_loaders |= member.ends_with("/libopenxr_loader_pico.so") || member.ends_with("/libpxrplatformloader.so");
   }
   if (!a64 && !a32) throw std::runtime_error("APK has no supported ARM native library slice");
   select_process_isa(a64 ? GuestIsa::a64 : GuestIsa::a32);
@@ -121,9 +132,24 @@ void configure_game(const std::filesystem::path& install,
   if (!mz_zip_reader_extract_to_mem(&zip, index, manifest.data(), manifest.size(), 0))
     throw std::runtime_error("cannot read APK manifest");
   config.device_identity = &select_device_identity(manifest_supported_devices(manifest));
-  log::info("launch", "Guest device identity: {} ({}){}", config.device_identity->model,
-            config.device_identity->device,
-            config.device_identity == &native_device_identity() ? "" : " via Horizon compatibility mode");
+  if (const auto* forced = find_device_identity(pending_device_overrides.preset)) {
+    config.device_identity = forced;
+    log::info("launch", "Guest device identity: {} ({}) set by the device setting", forced->model, forced->device);
+  } else {
+    log::info("launch", "Guest device identity: {} ({}){}", config.device_identity->model,
+              config.device_identity->device,
+              config.device_identity == &native_device_identity() ? "" : " via Horizon compatibility mode");
+  }
+  for (const auto& [name, value] : pending_device_overrides.properties) {
+    config.properties[name] = value;
+    log::info("launch", "Guest property {} overridden by the device setting", name);
+  }
+  // Apps that ship loaders for other headsets choose among them by the guest's product identity, which
+  // Venture presents as a Quest unless the device setting says otherwise.
+  if (vendor_loaders)
+    log::warn("launch",
+              "This app also ships loaders for other headsets (Pico or similar); it will take its Quest path "
+              "unless the device setting presents another identity.");
   auto base = paths::data_dir();
   config.passthrough = environment::passthrough_enabled();
   config.passthrough_key = environment::passthrough_color_key();

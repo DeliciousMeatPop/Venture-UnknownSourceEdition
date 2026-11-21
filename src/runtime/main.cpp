@@ -233,6 +233,7 @@ int main(int argc, char** argv) {
     std::uintptr_t credential_read = 0, credential_write = 0;
     bool inspect = false, boot_native = false, defer_gpu = false, test_a32_memory = false;
     bool leaderboard_writes = true, dev_identity = false;
+    venture::DeviceOverrides device;
     bool runtime_worker = false, console = false;
     std::uint32_t parent_pid = 0;
     double run_seconds = 0;
@@ -269,6 +270,13 @@ int main(int argc, char** argv) {
       else if (option == "--defer-gpu") defer_gpu = true;
       else if (option == "--no-leaderboard-writes") leaderboard_writes = false;
       else if (option == "--dev-identity") dev_identity = true;
+      else if (option == "--device") device.preset = value();
+      else if (option == "--device-prop") {
+        auto text = value();
+        auto eq = text.find('=');
+        if (eq == std::string::npos) throw std::runtime_error("--device-prop needs NAME=VALUE");
+        device.properties[text.substr(0, eq)] = text.substr(eq + 1);
+      }
       else if (option == "--test-a32-memory")
         test_a32_memory = true;
       else if (option == "--run-guest-test") guest_test = venture::paths::from_utf8(value());
@@ -293,6 +301,7 @@ int main(int argc, char** argv) {
       else if (option == "--help") {
         std::cout << "venture-runtime --game <install dir> [--boot-native | "
                      "--inspect] [--package <pkg>] [--log <file>] [--console] [--dev-identity]\n"
+                     "Experimental device options: --device <quest|quest2|questpro|quest3> --device-prop NAME=VALUE (repeatable)\n"
                      "venture-runtime --run-guest-test <so> [--test-dir "
                      "<dir>] [--log <file>] [--console]\n"
                      "Java options: --java-home <JDK/JRE> --class-path <jar or "
@@ -465,6 +474,7 @@ int main(int argc, char** argv) {
             "launcher before starting a game");
     }
     venture::initialize_diagnostic_trace();
+    venture::set_device_overrides(std::move(device));
     venture::configure_game(game, package,
                        account_key.empty() ? "local" : account_key);
     venture::AddressSpace::get().initialize(venture::process_config().isa());

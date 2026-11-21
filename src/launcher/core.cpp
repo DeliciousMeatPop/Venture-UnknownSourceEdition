@@ -1372,6 +1372,22 @@ void Core::set_dev_identity(std::string_view app_id, bool on) {
   else settings_.dev_identity.erase(id);
   settings_.save(data_);
 }
+void Core::set_device_preset(std::string_view app_id, std::string_view preset) {
+  const std::string id(app_id);
+  if (preset.empty()) settings_.device_preset.erase(id);
+  else settings_.device_preset[id] = std::string(preset);
+  settings_.save(data_);
+}
+std::string Core::device_preset(std::string_view app_id) const {
+  auto it = settings_.device_preset.find(std::string(app_id));
+  return it == settings_.device_preset.end() ? std::string() : it->second;
+}
+void Core::set_device_props(std::string_view app_id, std::map<std::string, std::string> props) {
+  const std::string id(app_id);
+  if (props.empty()) settings_.device_props.erase(id);
+  else settings_.device_props[id] = std::move(props);
+  settings_.save(data_);
+}
 bool Core::should_ask_dev_identity(std::string_view app_id) const {
   const std::string id(app_id);
   if (settings_.dev_identity.contains(id) || settings_.dev_identity_asked.contains(id)) return false;
@@ -1801,6 +1817,15 @@ void Core::launch_game(std::string_view id, std::string_view requested,
   // The runtime's account for saves and platform calls; "local" is none.
   // A dev-identity app uses no Meta account at all.
   const bool dev = settings_.dev_identity.contains(game_id);
+  // Experimental device presentation for this game, as runtime options.
+  std::vector<std::string> device_args;
+  if (auto it = settings_.device_preset.find(game_id); it != settings_.device_preset.end() && !it->second.empty())
+    device_args = {"--device", it->second};
+  if (auto it = settings_.device_props.find(game_id); it != settings_.device_props.end())
+    for (const auto &[name, value] : it->second) {
+      device_args.push_back("--device-prop");
+      device_args.push_back(name + "=" + value);
+    }
   if (dev) catalog_token.clear();
   const auto key = dev || choice.account_key.empty() ? std::string("local") : choice.account_key;
   const auto runtime = settings_.runtime;
@@ -1814,7 +1839,7 @@ void Core::launch_game(std::string_view id, std::string_view requested,
                 ? "Preparing application credentials..."
                 : "Updating the installation manifest from Meta...";
   worker_->submit([this, install, app_id, key, runtime, root, details, reply,
-                   console, catalog_token, dev](std::stop_token stop) -> Worker::Completion {
+                   console, catalog_token, dev, device_args](std::stop_token stop) -> Worker::Completion {
     try {
       if (reply) {
         std::lock_guard lock(reply->mutex);
@@ -1863,7 +1888,7 @@ void Core::launch_game(std::string_view id, std::string_view requested,
       if (stop.stop_requested())
         throw std::runtime_error("Game launch cancelled.");
       return [this, install, app_id, key, runtime, root, console, broker,
-              details, reply, dev, catalog = std::move(catalog)] {
+              details, reply, dev, device_args, catalog = std::move(catalog)] {
         launch_pending_.erase(app_id);
         if (reply && !reply->begin()) {
           game_locks_.erase(app_id);
@@ -1914,6 +1939,7 @@ void Core::launch_game(std::string_view id, std::string_view requested,
             args.push_back("--console");
           if (dev)
             args.push_back("--dev-identity");
+          args.insert(args.end(), device_args.begin(), device_args.end());
           if (options_.smoke_seconds)
             args.insert(args.end(), {"--run-seconds",
                                      std::to_string(options_.smoke_seconds)});

@@ -198,6 +198,11 @@ protected:
   // Whether the launcher should offer dev identity for a package (a "dev"
   // namespace segment); only a suggestion, the user decides.
   static bool suggests_dev_identity(std::string_view package);
+  // Experimental: the headset the game sees (saved per app). A preset is quest, quest2, questpro or quest3;
+  // empty follows the APK. Properties override guest ro.product.* strings (see valid_device_property).
+  void set_device_preset(std::string_view app_id, std::string_view preset);
+  std::string device_preset(std::string_view app_id) const;
+  void set_device_props(std::string_view app_id, std::map<std::string, std::string> props);
   // Whether Play should first ask: a dev-looking package not yet decided.
   bool should_ask_dev_identity(std::string_view app_id) const;
   // Records the answer (saved); the prompt never shows again for this app.
