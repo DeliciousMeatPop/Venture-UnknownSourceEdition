@@ -1166,6 +1166,12 @@ void App::draw_game_page() {
         if (button(r.quitting ? "Quitting...##play" : "Quit game##play", r.quitting ? 0 : icons::cancel,
                    Tone::secondary, cta, !r.quitting && armed))
           r.quitting = r.process.request_stop();
+        // Closing the desktop mirror window only closes the mirror; the game keeps running in the headset.
+        gap(6);
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + inner);
+        text(fonts().regular, kSmall, color::text3,
+             "Closing the desktop mirror window does not end the game. Use Quit game, or quit from the game's own menu.");
+        ImGui::PopTextWrapPos();
       } else if (button("Play##play", icons::play, Tone::primary, cta)) {
         action([&] { play_or_ask(g); });
       }
