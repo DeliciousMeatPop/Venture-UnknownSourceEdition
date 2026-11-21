@@ -759,7 +759,9 @@ void Mirror::run() {
   if (present_cost_.count) log_costs(capture_cost_);
   if (close) {
     user_closed_ = true;
-    log::info("mirror", "Desktop mirror closed");
+    log::warn("mirror",
+              "Desktop mirror window closed. The game is still running in your headset: closing the mirror does not "
+              "end it. To quit, use Quit game in the Venture launcher or the game's own menu.");
   } else if (!stop_) {
     failed_ = true;
   }
