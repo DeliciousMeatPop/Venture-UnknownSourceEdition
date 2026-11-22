@@ -1,0 +1,6 @@
+# The tip of upstream Venture's main branch (Villagers654/Venture) that this fork has accounted for.
+# The Release workflow compares upstream's current main tip with the first line below that is not a
+# comment; if they differ, upstream has new commits and the release waits for your approval.
+# Update this line after you have merged or ported upstream's changes (or decided you do not need them).
+# Upstream main at 0.2.5.1 (its 0.2.5.1 hotfix, "ship the JRE's EC crypto", is already in this fork):
+f88cc2b7fb2556887926c637d21d037c1ea6856a

@@ -47,16 +47,18 @@ jobs:
           tags=$(git ls-remote --tags --refs "$UPSTREAM" 'v*' | sed 's|.*refs/tags/v||')
           stable=$(printf '%s\n' "$tags" | grep -v -- '-' | sort -V | tail -1)
           latest=$(printf '%s\n' "$tags" | sort -V | tail -1)
-          # Commits on upstream's main that this commit does not contain.
-          git fetch -q --no-tags "$UPSTREAM" main:refs/remotes/upstream/main
-          behind=$(git rev-list --count HEAD..refs/remotes/upstream/main)
+          # Upstream's main tip against the one this fork has accounted for (.github/upstream-synced.txt). Comparing
+          # tips, not commit counts, keeps the check right when upstream rewrites or squashes its history.
+          tip=$(git ls-remote "$UPSTREAM" refs/heads/main | cut -f1)
+          synced=$(grep -v '^#' .github/upstream-synced.txt | grep -m1 . | tr -d '[:space:]')
           {
             echo "### Upstream check"
             echo "| | |"; echo "|---|---|"
             echo "| This fork's version | \`$ours\` |"
             echo "| Upstream newest stable | \`${stable:-none}\` |"
             echo "| Upstream newest (any) | \`${latest:-none}\` |"
-            echo "| Upstream main commits not in this build | $behind |"
+            echo "| Upstream main tip | \`${tip:0:10}\` |"
+            echo "| Upstream main tip this fork has accounted for | \`${synced:0:10}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$SKIP" = "true" ]; then
             echo "Upstream check skipped by request." | tee -a "$GITHUB_STEP_SUMMARY"
@@ -65,8 +67,10 @@ jobs:
               echo "::warning title=Newer upstream release::Upstream Venture v$stable is newer than this fork's $ours. Merge or port it first, or approve to build anyway."
               newer=true
             fi
-            if [ "$behind" -gt 0 ]; then
-              echo "::warning title=Upstream has new commits::Upstream main is $behind commit(s) ahead of this build. Merge it first, or approve to build anyway."
+            if [ -z "$tip" ]; then
+              echo "::warning title=Upstream unreachable::Could not read upstream's main branch; not gating on it."
+            elif [ "$tip" != "$synced" ]; then
+              echo "::warning title=Upstream main has moved::Upstream main is now ${tip:0:10}, this fork last accounted for ${synced:0:10}. Merge or port its changes (then update .github/upstream-synced.txt), or approve to build anyway."
               newer=true
             fi
             if [ -n "$latest" ] && [ "$latest" != "$stable" ] && [ "$latest" != "$ours" ]; then
