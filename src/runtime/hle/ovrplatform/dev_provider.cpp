@@ -2,41 +2,69 @@
 
 #include <nlohmann/json.hpp>
 
+#include <charconv>
+#include <condition_variable>
+#include <mutex>
+
+#include "common/environment.h"
 #include "common/log.h"
 #include "hle/ovrplatform/identity_iap.h"
 
 namespace venture::ovrplatform {
 namespace {
-constexpr Id kDevUserId = 1;
 constexpr const char* kDevAlias = "Developer";
+
+bool printable_name(std::string_view s) {
+  if (s.empty() || s.size() > 64) return false;
+  for (unsigned char c : s)
+    if (c < 0x20 || c > 0x7e) return false;
+  return true;
+}
 
 class DevProvider final : public Provider {
   AppIdentity app_;
+  DevSettings settings_;
+  // Waits the configured latency; true if the request was cancelled meanwhile.
+  bool wait(std::stop_token stop) const {
+    if (settings_.latency.count() > 0) {
+      std::mutex mutex;
+      std::condition_variable_any wake;
+      std::unique_lock lock(mutex);
+      wake.wait_for(lock, stop, settings_.latency, [] { return false; });
+    }
+    return stop.stop_requested();
+  }
+  User user() const { return {settings_.user_id, settings_.alias, settings_.display_name}; }
 
  public:
-  explicit DevProvider(AppIdentity app) : app_(std::move(app)) {}
+  explicit DevProvider(AppIdentity app)
+      : app_(std::move(app)),
+        settings_(dev_settings([](const char* name) { return environment::getenv(name); })) {}
   Error prepare() override {
     log::warn("accounts",
               "DEV IDENTITY active for {}: local developer user, no Meta account, "
               "entitlement not checked. Enabled by the per-app dev setting.",
               app_.package);
+    log::info("accounts", "Dev user id={} alias={} display_name={} answer delay={} ms", settings_.user_id,
+              settings_.alias, settings_.display_name, settings_.latency.count());
+    for (const auto& problem : settings_.problems) log::warn("accounts", "Dev setting ignored: {}", problem);
     return {};
   }
   void declare_app_id(std::string_view id) override { app_.app_id = std::string(id); }
   Result entitlement(std::stop_token stop) override {
-    if (stop.stop_requested()) return {failure(ErrorCode::cancelled)};
+    if (wait(stop)) return {failure(ErrorCode::cancelled)};
     return {};
   }
   Result logged_in_user(std::stop_token stop) override {
-    if (stop.stop_requested()) return {failure(ErrorCode::cancelled)};
-    return {{}, {kDevUserId, kDevAlias, {}}};
+    if (wait(stop)) return {failure(ErrorCode::cancelled)};
+    return {{}, user()};
   }
   Result access_token(std::stop_token stop) override {
-    if (stop.stop_requested()) return {failure(ErrorCode::cancelled)};
-    return {{}, {kDevUserId, kDevAlias, {}}, "venture-dev-token"};
+    if (wait(stop)) return {failure(ErrorCode::cancelled)};
+    return {{}, user(), "venture-dev-token"};
   }
   Result user_proof(std::stop_token stop) override {
-    if (stop.stop_requested()) return {failure(ErrorCode::cancelled)};
+    if (wait(stop)) return {failure(ErrorCode::cancelled)};
     return {{}, {}, "venture-dev-nonce"};
   }
   Result heartbeat(std::string_view, std::stop_token stop) override {
@@ -44,7 +72,7 @@ class DevProvider final : public Provider {
     return {{}, {}, "60"};
   }
   HttpResponse graph_request(HttpRequest request, std::stop_token stop) override {
-    if (stop.stop_requested()) return {0, {}, failure(ErrorCode::cancelled)};
+    if (wait(stop)) return {0, {}, failure(ErrorCode::cancelled)};
     return dev_graph_response(request);
   }
   Result service(std::string_view name, const RequestArgs& args,
@@ -68,6 +96,39 @@ class DevProvider final : public Provider {
   }
 };
 }  // namespace
+
+DevSettings dev_settings(const std::function<const char*(const char*)>& get) {
+  DevSettings out;
+  auto value = [&](const char* name) -> std::string_view {
+    const char* text = get(name);
+    return text ? std::string_view(text) : std::string_view();
+  };
+  if (auto id = value("VENTURE_DEV_USER_ID"); !id.empty()) {
+    Id parsed = 0;
+    auto [end, error] = std::from_chars(id.data(), id.data() + id.size(), parsed);
+    if (error == std::errc{} && end == id.data() + id.size() && parsed && valid_id(id))
+      out.user_id = parsed;
+    else
+      out.problems.push_back("VENTURE_DEV_USER_ID must be a nonzero number of digits");
+  }
+  if (auto alias = value("VENTURE_DEV_USER_ALIAS"); !alias.empty()) {
+    if (printable_name(alias)) out.alias = std::string(alias);
+    else out.problems.push_back("VENTURE_DEV_USER_ALIAS must be 1 to 64 printable ASCII characters");
+  }
+  if (auto name = value("VENTURE_DEV_USER_NAME"); !name.empty()) {
+    if (printable_name(name)) out.display_name = std::string(name);
+    else out.problems.push_back("VENTURE_DEV_USER_NAME must be 1 to 64 printable ASCII characters");
+  }
+  if (auto latency = value("VENTURE_DEV_LATENCY_MS"); !latency.empty()) {
+    int parsed = -1;
+    auto [end, error] = std::from_chars(latency.data(), latency.data() + latency.size(), parsed);
+    if (error == std::errc{} && end == latency.data() + latency.size() && parsed >= 0 && parsed <= 10000)
+      out.latency = std::chrono::milliseconds(parsed);
+    else
+      out.problems.push_back("VENTURE_DEV_LATENCY_MS must be a whole number from 0 to 10000");
+  }
+  return out;
+}
 
 HttpResponse dev_graph_response(const HttpRequest& request) {
   const auto& endpoint = request.endpoint;
