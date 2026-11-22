@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <charconv>
+#include <format>
 #include <mutex>
 #include <nlohmann/json.hpp>
 
+#include "common/environment.h"
 #include "common/log.h"
 #include "common/paths.h"
 
@@ -226,6 +228,34 @@ bool sku_valid(std::string_view s) {
   return !s.empty() && s.size() <= 64 * 1024 &&
          s.find_first_of(",\r\n") == s.npos && s.find('\0') == s.npos;
 }
+// The shape of a product query for the log, never the SKU text.
+std::string sku_shape(const std::vector<std::string>& skus, std::int32_t count) {
+  std::size_t empty = 0, invalid = 0, longest = 0;
+  for (const auto& sku : skus) {
+    if (sku.empty()) ++empty;
+    else if (!sku_valid(sku)) ++invalid;
+    longest = std::max(longest, sku.size());
+  }
+  return std::format("entries={} count_argument={} empty={} invalid_characters={} longest={}", skus.size(),
+                     count, empty, invalid, longest);
+}
+// VENTURE_TRACE_IAP_SKUS=1 also logs the SKU strings of product queries (product ids, not personal data;
+// off by default, as request values are never logged otherwise).
+void trace_skus(const std::vector<std::string>& skus) {
+  static const bool on = [] {
+    const char* value = environment::getenv("VENTURE_TRACE_IAP_SKUS");
+    return value && std::string_view(value) == "1";
+  }();
+  if (!on) return;
+  std::string text;
+  for (std::size_t i = 0; i < skus.size() && i < 100; ++i) {
+    if (i) text += ", ";
+    text += '"';
+    for (unsigned char c : skus[i].substr(0, 80)) text += (c >= 0x20 && c < 0x7f) ? char(c) : '?';
+    text += '"';
+  }
+  log::info("ovrplatform", "ovr_IAP_GetProductsBySKU SKUs: [{}]{}", text, skus.size() > 100 ? " (first 100)" : "");
+}
 }  // namespace
 std::span<const ServiceSpec> identity_iap_services() { return services; }
 void register_identity_iap_endpoints(HttpTransport& http) {
@@ -262,11 +292,23 @@ HttpRequest identity_iap_request(std::string_view name,
   if (name == "ovr_IAP_GetProductsBySKU") {
     const auto& skus = arg<std::vector<std::string>>(args, 0);
     auto count = arg<std::int32_t>(args, 1);
-    if (skus.size() > 4096 || count < std::int32_t(skus.size()) || count > 4096)
+    trace_skus(skus);
+    if (skus.size() > 4096 || count < std::int32_t(skus.size()) || count > 4096) {
+      log::warn("ovrplatform", "ovr_IAP_GetProductsBySKU rejected: the SKU count is out of range ({})",
+                sku_shape(skus, count));
       throw std::invalid_argument("Invalid Platform SKU count");
+    }
     std::string joined;
     for (const auto& sku : skus) {
-      if (!sku_valid(sku)) throw std::invalid_argument("Invalid Platform SKU");
+      // An empty entry names no product, like a null one (skipped when the arguments are read): skip it.
+      if (sku.empty()) continue;
+      if (!sku_valid(sku)) {
+        log::warn("ovrplatform",
+                  "ovr_IAP_GetProductsBySKU rejected: a SKU contains a comma, line break or NUL, or is "
+                  "oversized ({})",
+                  sku_shape(skus, count));
+        throw std::invalid_argument("Invalid Platform SKU");
+      }
       if (!joined.empty()) joined += ',';
       joined += sku;
     }

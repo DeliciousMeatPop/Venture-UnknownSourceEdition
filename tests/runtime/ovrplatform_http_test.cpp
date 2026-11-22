@@ -1034,3 +1034,27 @@ TEST_CASE(
             .error.code == ErrorCode::identity_mismatch);
   CHECK(server.requests().size() == 3);
 }
+
+TEST_CASE("a product query skips empty SKUs like null ones and still refuses unsafe ones") {
+  using namespace venture::ovrplatform;
+  auto skus_of = [](std::vector<std::string> skus) {
+    const auto count = static_cast<std::int32_t>(skus.size());
+    const auto request = identity_iap_request("ovr_IAP_GetProductsBySKU", RequestArgs{{std::move(skus), count}});
+    for (const auto& [name, value] : request.parameters)
+      if (name == "skus") return value;
+    return std::string("<none>");
+  };
+  CHECK(skus_of({"a", "b"}) == "a,b");
+  // Unused slots games leave empty name no product: they are dropped, the real ones kept in order.
+  CHECK(skus_of({"a", "", "b"}) == "a,b");
+  CHECK(skus_of({"", "only"}) == "only");
+  // No SKU at all asks for the viewer's whole catalog, as before.
+  CHECK(skus_of({}) == "<none>");
+  // A comma would add a SKU, a line break would split the request: still refused.
+  CHECK_THROWS_AS(skus_of({"a,b"}), std::invalid_argument);
+  CHECK_THROWS_AS(skus_of({"a\nb"}), std::invalid_argument);
+  // A count smaller than the list is still refused.
+  CHECK_THROWS_AS(identity_iap_request("ovr_IAP_GetProductsBySKU",
+                                       RequestArgs{{std::vector<std::string>{"a", "b"}, std::int32_t{1}}}),
+                  std::invalid_argument);
+}

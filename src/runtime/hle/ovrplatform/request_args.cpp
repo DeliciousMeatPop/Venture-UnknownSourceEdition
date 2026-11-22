@@ -5,6 +5,7 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "common/log.h"
 #include "core/guest.h"
 #include "hle/ovrplatform/session.h"
 #include "platform/memory.h"
@@ -140,7 +141,9 @@ RequestArgs snapshot_request_args(Session& session, const RequestArgumentSpec& s
           return out;
       }
     }
-  } catch (const std::invalid_argument&) {
+  } catch (const std::invalid_argument& error) {
+    // The messages are fixed text: never guest strings or values.
+    log::warn("ovrplatform", "{} arguments rejected: {}", spec.name, error.what());
     out.error = failure(ErrorCode::invalid_argument);
   }
   return out;
