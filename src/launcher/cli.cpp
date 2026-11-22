@@ -146,7 +146,7 @@ Args parse(const std::vector<std::string> &argv) {
   static const std::set<std::string> known{"--json",   "--offline", "--yes",          "-y",
                                            "--all",    "--installed", "--delete-saves", "--headset",
                                            "--help",   "-h",        "--version",      "--manual",
-                                           "--upload"};
+                                           "--upload", "--dev-identity", "--no-dev-identity"};
   Args out;
   for (size_t i = 1; i < argv.size(); ++i) {
     const auto &a = argv[i];
