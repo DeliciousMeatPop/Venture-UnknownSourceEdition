@@ -330,8 +330,6 @@ public final class ApkCache {
         return publish(work, context, report);
     }
 
-    static final Pattern INACCESSIBLE_SUPER = Pattern.compile("cannot access its (?:abstract )?super(?:class|interface) (\\S+)");
-
     static Set<String> classNames(List<Path> jars) throws IOException {
         Set<String> names = new HashSet<>();
         for (Path jar : jars)
@@ -345,28 +343,7 @@ public final class ApkCache {
     }
 
     static boolean deferredLinkage(Map<?, ?> f, Set<String> frameworkClasses) {
-        // A missing framework method or field fails only the call that reaches it, as on ART.
-        if ("framework-member".equals(f.get("stage"))) return true;
-        if ("frames".equals(f.get("stage"))) return str(f, "detail").contains("missing frame hierarchy:");
-        if ("hotspot".equals(f.get("stage"))) {
-            // A class that does not verify fails when it is reached, as ART
-            // fails a method when it runs; bundled SDK code a VR game never
-            // reaches must not stop the game.
-            Object kind = f.get("kind");
-            // HotSpot refuses app classes in java.* packages, which ART loads;
-            // Stremio's libVLC bundles Blu-ray menu classes in java.awt and java.io.
-            if ("java.lang.SecurityException".equals(kind)) return str(f, "detail").startsWith("Prohibited package name:");
-            // ART links a class when it is first used and fails it then. An app class that cannot
-            // access another app class (Alcove's media-compat classes extend a package-private
-            // Stub in another package) is the app's own; an inaccessible framework class is ours.
-            if ("java.lang.IllegalAccessError".equals(kind)) {
-                Matcher m = INACCESSIBLE_SUPER.matcher(str(f, "detail"));
-                return m.find() && !frameworkClasses.contains(m.group(1).replace('.', '/'));
-            }
-            return "java.lang.NoClassDefFoundError".equals(kind) || "java.lang.ClassNotFoundException".equals(kind)
-                || "java.lang.VerifyError".equals(kind);
-        }
-        return false;
+        return Linkage.deferred(f, frameworkClasses);
     }
 
     static <T> void declarations(List<Object> failures, String label, Set<T> expected, Set<T> actual) {

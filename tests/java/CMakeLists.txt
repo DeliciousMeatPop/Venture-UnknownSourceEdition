@@ -55,6 +55,9 @@ if(TARGET venture-framework)
   # R8's superclass-constructor calls on a new-instance (Open Brush, Unity's UnityPlayer).
   add_test(NAME dex_super_init COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/super_init_test.py")
   set_tests_properties(dex_super_init PROPERTIES TIMEOUT 120)
+  # Which converter verification failures are deferred linkage and which stop an app from starting.
+  add_test(NAME dex_linkage COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/converter_linkage_test.py")
+  set_tests_properties(dex_linkage PROPERTIES TIMEOUT 120)
 
   # Several JVM fixtures take ~16 s even on an idle host. Assertions in the
   # fixtures test behavior; this bound only catches a stalled suite.
