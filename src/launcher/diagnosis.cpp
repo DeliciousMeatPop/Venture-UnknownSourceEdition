@@ -100,6 +100,14 @@ constexpr Rule kRules[] = {
     {{"gpu reset", "ring timeout", "nvrm: xid", "gpu hang",
       "stopped responding and has successfully recovered"},  // Windows: Display event 4101
      "The graphics driver reset the GPU during the game.", kGpuAdvice},
+    // hle/vulkan/vulkan.cpp: the driver's own fault report says the GPU read or wrote an address that was not
+    // mapped. That is an error in the commands the game's rendering sent, not a driver or overlay problem, and
+    // the VR runtime's own crash afterwards (its streaming driver losing the device) is a consequence.
+    {{"gpu page fault detected"},
+     "The GPU read or wrote memory that was not mapped (a page fault) while the game was rendering.",
+     "This is most likely a bug in Venture or the game, not your driver. Send this report with an issue, and "
+     "say if it happens at the same point every time. If SteamVR or another VR runtime also reports a crash, "
+     "that probably came after this fault."},
     // hle/vulkan/vulkan.cpp, and the host's own device loss.
     {{"native vulkan device lost", "vk_error_device_lost"},
      "The game lost the graphics device.", kGpuAdvice},
