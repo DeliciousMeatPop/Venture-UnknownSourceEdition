@@ -14,8 +14,11 @@ from convert_apk import DEPS, java_tool
 # JSSE offers no ECDHE group, no ECDHE suite and no ECDSA signature, so Google, Firebase and most
 # CDN servers answer every HTTPS ClientHello with handshake_failure (issue 168). Dev runs use the
 # full JDK, so only the shipped JRE showed it.
+# jdk.charsets: the extended charsets (GB2312, GBK, Big5, Shift_JIS, EUC-KR, ...). Android always has
+# them, and apps ask for them by name: SKYBOX's native startup calls String.getBytes("GB2312") and
+# died with UnsupportedEncodingException on the base-only JRE.
 # No java.sql or java.net.http.
-MODULES = "java.base,java.logging,java.xml,java.desktop,jdk.crypto.ec,jdk.unsupported"
+MODULES = "java.base,java.logging,java.xml,java.desktop,jdk.charsets,jdk.crypto.ec,jdk.unsupported"
 
 
 def main():

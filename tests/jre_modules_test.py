@@ -36,6 +36,10 @@ class JreModulesTest(unittest.TestCase):
         # Android's EC KeyPairGenerator, KeyAgreement and Signature algorithms need it as well.
         self.assertIn("jdk.crypto.ec", modules())
 
+    def test_extended_charsets_are_in_the_jre(self):
+        # Android has GB2312, Big5, Shift_JIS ... built in; SKYBOX's startup asks for GB2312 by name.
+        self.assertIn("jdk.charsets", modules())
+
 
 if __name__ == "__main__":
     sys.exit(unittest.main())
