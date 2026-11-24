@@ -35,14 +35,12 @@ TEST_CASE("PrivateBin encodings and paste round trip") {
   CHECK(privatebin::base64(crypto::Bytes{'f', 'o', 'o'}) == "Zm9v");
   CHECK(privatebin::base58(crypto::Bytes{0, 0, 1}) == "112");
   CHECK(privatebin::base58(crypto::Bytes{'h', 'e', 'l', 'l', 'o'}) == "Cn8eVZg");
-  std::string text = "report cafÃ© "quoted" \ tab	
-";
-  for (int i = 0; i < 2000; ++i) text += "12345.678 I [launch] repeated log line " + std::to_string(i) + "
-";
+  std::string text = "report caf\xC3\xA9 \"quoted\" \\ tab\t\n";
+  for (int i = 0; i < 2000; ++i) text += "12345.678 I [launch] repeated log line " + std::to_string(i) + "\n";
   auto enc = privatebin::encrypt(text, "1month");
   CHECK(privatebin::decrypt(enc.body, enc.fragment) == text);
   auto other = privatebin::encrypt(text, "1month");
   CHECK_THROWS(privatebin::decrypt(enc.body, other.fragment));
-  auto odd = privatebin::encrypt("bad byte ÿþ here", "1day");
+  auto odd = privatebin::encrypt("bad byte \xFF\xFE here", "1day");
   CHECK(privatebin::decrypt(odd.body, odd.fragment).starts_with("bad byte"));
 }
