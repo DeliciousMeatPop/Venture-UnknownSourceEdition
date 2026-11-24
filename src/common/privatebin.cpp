@@ -183,8 +183,17 @@ std::string paste(std::string_view server, std::string_view text, std::string_vi
   if (reply_http.status != 200 || !reply.is_object() || reply.value("status", 1) != 0 ||
       !reply.contains("id") || !reply["id"].is_string() || !valid_id(reply["id"].get<std::string>())) {
     std::string why = reason(reply);
-    throw std::runtime_error(why.empty() ? "The upload service answered " + std::to_string(reply_http.status) + "."
-                                         : "The upload service refused it: " + why);
+    if (!why.empty()) throw std::runtime_error("The upload service refused it: " + why);
+    // Not a PrivateBin answer (a proxy or firewall in front of it): show how it began, in one line.
+    std::string excerpt;
+    for (char c : reply_http.body) {
+      if (excerpt.size() >= 120) break;
+      if (c == '\r' || c == '\n' || c == '\t') c = ' ';
+      if (static_cast<unsigned char>(c) >= 0x20 && static_cast<unsigned char>(c) < 0x7f && !(c == ' ' && (excerpt.empty() || excerpt.back() == ' ')))
+        excerpt += c;
+    }
+    throw std::runtime_error("The upload service answered " + std::to_string(reply_http.status) +
+                             (excerpt.empty() ? "." : ": " + excerpt));
   }
   return std::string(server) + "/?" + reply["id"].get<std::string>() + "#" + sealed.fragment;
 }
