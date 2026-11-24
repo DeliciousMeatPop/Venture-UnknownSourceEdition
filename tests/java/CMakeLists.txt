@@ -25,8 +25,9 @@ if(TARGET venture-framework)
       "${CMAKE_CURRENT_SOURCE_DIR}/DownloadManagerTest.java"
       "${CMAKE_CURRENT_SOURCE_DIR}/AndroidKeyStoreTest.java"
       "${CMAKE_CURRENT_SOURCE_DIR}/InstrumentationProbe.java"
+      "${CMAKE_CURRENT_SOURCE_DIR}/GestureDetectorTest.java"
     DEPENDS "${VENTURE_FRAMEWORK_JAR}" FrameworkTest.java AbiProfileTest.java VMStackTest.java ProcessExitTest.java ProcessCommandsTest.java
-      ColdRestartTest.java LifecycleTest.java LocalServicesTest.java PreferencesTest.java AssetReadTraceTest.java RecordingHost.java TestNatives.java GraphicsTest.java ThermalTest.java MenuQuitTest.java SQLiteTest.java WebkitTest.java DownloadManagerTest.java AndroidKeyStoreTest.java InstrumentationProbe.java VERBATIM)
+      ColdRestartTest.java LifecycleTest.java LocalServicesTest.java PreferencesTest.java AssetReadTraceTest.java RecordingHost.java TestNatives.java GraphicsTest.java ThermalTest.java MenuQuitTest.java SQLiteTest.java WebkitTest.java DownloadManagerTest.java AndroidKeyStoreTest.java InstrumentationProbe.java GestureDetectorTest.java VERBATIM)
   add_custom_target(venture_framework_tests ALL DEPENDS "${framework_test_classes}/FrameworkTest.class")
   if(WIN32)
     set(framework_classpath "${VENTURE_FRAMEWORK_JAR}\;${framework_test_classes}")
@@ -43,6 +44,8 @@ if(TARGET venture-framework)
   set_tests_properties(framework_webkit PROPERTIES TIMEOUT 30)
   add_test(NAME framework_download_manager COMMAND "${VENTURE_JAVA}" -Xverify:all -cp "${framework_classpath}" android.app.DownloadManagerTest)
   set_tests_properties(framework_download_manager PROPERTIES TIMEOUT 60)
+  add_test(NAME framework_gesture_detector COMMAND "${VENTURE_JAVA}" -Xverify:all -cp "${framework_classpath}" GestureDetectorTest)
+  set_tests_properties(framework_gesture_detector PROPERTIES TIMEOUT 60)
   add_test(NAME framework_android_keystore COMMAND "${VENTURE_JAVA}" -Xverify:all -cp "${framework_classpath}" AndroidKeyStoreTest)
   set_tests_properties(framework_android_keystore PROPERTIES TIMEOUT 60)
 
@@ -55,6 +58,9 @@ if(TARGET venture-framework)
   # R8's superclass-constructor calls on a new-instance (Open Brush, Unity's UnityPlayer).
   add_test(NAME dex_super_init COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/super_init_test.py")
   set_tests_properties(dex_super_init PROPERTIES TIMEOUT 120)
+  # Which converter verification failures are deferred linkage and which stop an app from starting.
+  add_test(NAME dex_linkage COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/converter_linkage_test.py")
+  set_tests_properties(dex_linkage PROPERTIES TIMEOUT 120)
 
   # Several JVM fixtures take ~16 s even on an idle host. Assertions in the
   # fixtures test behavior; this bound only catches a stalled suite.
