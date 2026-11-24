@@ -10,6 +10,7 @@ add_executable(venture_tests
   controls_test.cpp
   paths_test.cpp
   digest_test.cpp
+  privatebin_test.cpp
   search_test.cpp
   auth_test.cpp
   sign_in_link_test.cpp

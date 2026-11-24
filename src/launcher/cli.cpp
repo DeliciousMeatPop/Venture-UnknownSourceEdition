@@ -66,7 +66,7 @@ Library
                                  (the most recent one by default): what happened,
                                  its likely cause, the system setup and the logs,
                                  with personal details removed; --upload also
-                                 shares it as a link (dpaste.com, 90 days)
+                                 shares it as a link (encrypted, 30 days)
 
 Add-ons
   addons GAME [--as ACCOUNT]     List a game's add-ons (as the owning account)
