@@ -32,6 +32,9 @@ bool secure_binary(std::string_view url);
 std::string with_delivery_token(std::string_view url, std::string_view token);
 Response post(std::string_view url, const Fields &fields,
               std::stop_token stop = {}, const Fields &headers = {});
+// POST with a raw body (JSON, say) and its content type; the reply is limited to 1 MiB.
+Response post_body(std::string_view url, const std::string &body, std::string_view content_type,
+                   std::stop_token stop = {}, const Fields &headers = {});
 Response get_meta(std::string_view url, const Fields &headers,
                   std::stop_token stop = {});
 // Explicit test transport; only the numeric loopback address can receive

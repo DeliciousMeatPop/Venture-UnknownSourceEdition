@@ -239,7 +239,8 @@ bool redirected(long status) {
 }
 Response memory(std::string_view url, const Fields *fields, size_t limit,
                 std::stop_token stop, const Fields &extra_headers = {},
-                bool loopback = false) {
+                bool loopback = false, const std::string *raw_body = nullptr,
+                std::string_view content_type = {}) {
   auto h = handle(url, &stop);
   if (loopback) {
     curl_easy_setopt(h.get(), CURLOPT_PROTOCOLS_STR, "http");
@@ -251,7 +252,7 @@ Response memory(std::string_view url, const Fields *fields, size_t limit,
     size_t limit;
   } sink{&r.body, limit};
   curl_easy_setopt(h.get(), CURLOPT_TIMEOUT, 40L);
-  if (!extra_headers.empty() && !fields) {
+  if (!extra_headers.empty() && !fields && !raw_body) {
     curl_easy_setopt(h.get(), CURLOPT_CONNECTTIMEOUT, 5L);
     curl_easy_setopt(h.get(), CURLOPT_TIMEOUT, 15L);
   }
@@ -279,6 +280,11 @@ Response memory(std::string_view url, const Fields *fields, size_t limit,
     curl_easy_setopt(h.get(), CURLOPT_POSTFIELDS, body.c_str());
     curl_easy_setopt(h.get(), CURLOPT_POSTFIELDSIZE_LARGE,
                      curl_off_t(body.size()));
+  } else if (raw_body) {
+    // The caller's bytes as they are (curl does not copy them: raw_body outlives perform).
+    curl_easy_setopt(h.get(), CURLOPT_POSTFIELDS, raw_body->data());
+    curl_easy_setopt(h.get(), CURLOPT_POSTFIELDSIZE_LARGE,
+                     curl_off_t(raw_body->size()));
   }
   raw_headers = curl_slist_append(nullptr, "Accept: application/json");
   if (!raw_headers)
@@ -291,6 +297,15 @@ Response memory(std::string_view url, const Fields *fields, size_t limit,
         value.find_first_of("\r\n") != value.npos)
       throw std::runtime_error("Invalid HTTP header.");
     auto *next = curl_slist_append(raw_headers, (key + ": " + value).c_str());
+    if (!next)
+      throw std::runtime_error("HTTP initialization failed.");
+    hs.release();
+    hs.reset(raw_headers = next);
+  }
+  if (raw_body && !content_type.empty()) {
+    if (content_type.find_first_of("\r\n") != content_type.npos)
+      throw std::runtime_error("Invalid HTTP header.");
+    auto *next = curl_slist_append(raw_headers, ("Content-Type: " + std::string(content_type)).c_str());
     if (!next)
       throw std::runtime_error("HTTP initialization failed.");
     hs.release();
@@ -429,6 +444,10 @@ std::string with_delivery_token(std::string_view url, std::string_view token) {
 Response post(std::string_view url, const Fields &fields, std::stop_token stop,
               const Fields &headers) {
   return memory(url, &fields, 16 * 1024 * 1024, stop, headers);
+}
+Response post_body(std::string_view url, const std::string &body, std::string_view content_type,
+                   std::stop_token stop, const Fields &headers) {
+  return memory(url, nullptr, 1024 * 1024, stop, headers, false, &body, content_type);
 }
 Response get_meta(std::string_view url, const Fields &headers,
                   std::stop_token stop) {

@@ -4,6 +4,7 @@
 #include "common/http/client.h"
 #include "common/library/library.h"
 #include "common/openxr_layers.h"
+#include "common/privatebin.h"
 #include "common/process.h"
 #include "common/saves_migration.h"
 #include "common/steam_library.h"
@@ -44,7 +45,7 @@ namespace {
 constexpr size_t kRuntimeLog = 448 << 10, kSideLog = 128 << 10, kLauncherLog = 128 << 10;
 constexpr size_t kReportBudget = 900'000, kPasteLimit = 1'000'000;
 constexpr size_t kKeptReports = 10;
-constexpr const char *kPasteDays = "90";
+constexpr const char *kPasteServer = "https://privatebin.etisbew.website", *kPasteExpire = "1month";
 
 std::string read_file(const fs::path &file, size_t limit = 64 << 10) {
   std::ifstream in(file, std::ios::binary);
@@ -1287,12 +1288,6 @@ std::string upload_debug_report(const fs::path &file, std::stop_token stop) {
   std::string text = read_file(file, kPasteLimit + 1);
   if (text.empty()) throw std::runtime_error("The report is empty.");
   if (text.size() > kPasteLimit) throw std::runtime_error("The report is too large to upload.");
-  auto r = http::post("https://dpaste.com/api/v2/",
-                      {{"content", text}, {"title", paths::utf8(file.filename())}, {"expiry_days", kPasteDays}},
-                      stop);
-  std::string url = r.body.substr(0, r.body.find_first_of("\r\n"));
-  if (r.status != 201 || !url.starts_with("https://dpaste.com/"))
-    throw std::runtime_error(std::format("The upload service answered {}.", r.status));
-  return url;
+  return privatebin::paste(kPasteServer, text, kPasteExpire, stop);
 }
 } // namespace venture::launcher
