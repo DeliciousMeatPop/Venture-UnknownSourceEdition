@@ -315,7 +315,14 @@ public class PackageManager {
     return false;
   }
   public int checkPermission(String permission, String pkg) {
-    if (!model.info.packageName.equals(pkg) || !model.permissions.contains(permission)) return -1;
+    if (!model.info.packageName.equals(pkg)) return -1;
+    // Android's implicit permission split: an app that declares WRITE_EXTERNAL_STORAGE is also
+    // treated as holding READ_EXTERNAL_STORAGE, so one that checks (or requests) READ alone, as
+    // media players do before listing a folder, is not refused for a permission it never needed
+    // to declare.
+    boolean impliedRead = "android.permission.READ_EXTERNAL_STORAGE".equals(permission)
+        && model.permissions.contains("android.permission.WRITE_EXTERNAL_STORAGE");
+    if (!impliedRead && !model.permissions.contains(permission)) return -1;
     // Runtime permissions the Quest permission dialog grants (RECORD_AUDIO).
     if (com.venture.runtime.RuntimePermissions.granted(model, permission)) return 0;
     return java.util.Set
