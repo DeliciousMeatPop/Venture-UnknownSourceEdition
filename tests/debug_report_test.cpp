@@ -66,6 +66,10 @@ TEST_CASE("debug report: known causes, most specific first") {
   auto lost = diagnose("E [vulkan-fault] Native Vulkan device lost on guest tid 7; ending the app\n");
   REQUIRE(lost);
   CHECK(lost->cause.find("graphics device") != std::string::npos);
+  auto fault = diagnose("W [vulkan-fault] vkGetDeviceFaultInfoEXT returned 0: GPU page fault detected (addresses=1)\n"
+                        "E [vulkan-fault] Native Vulkan device lost on guest tid 7; ending the app\n");
+  REQUIRE(fault);
+  CHECK(fault->cause.find("page fault") != std::string::npos);
   auto reset = diagnose("kernel: amdgpu 0000:03:00.0: amdgpu: GPU reset begin!\n");
   REQUIRE(reset);
   CHECK(reset->cause.find("reset the GPU") != std::string::npos);

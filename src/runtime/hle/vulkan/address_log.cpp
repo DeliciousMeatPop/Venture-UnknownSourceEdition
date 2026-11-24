@@ -149,7 +149,17 @@ void address_log_detach(VkInstance instance) {
     destroy(instance, messenger, nullptr);
 }
 bool address_log_device(const std::vector<VkExtensionProperties>& host) {
-  return address_log_enabled() && supported(host, VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_EXTENSION_NAME);
+  if (!address_log_enabled()) return false;
+  if (supported(host, VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_EXTENSION_NAME)) return true;
+  // The driver cannot report address bindings: say so once, or a fault report with no trace looks like a
+  // diagnostic that failed to start.
+  static std::once_flag warned;
+  std::call_once(warned, [] {
+    log::warn("vulkan",
+              "VENTURE_VULKAN_ADDRESS_LOG is set, but this GPU driver lacks VK_EXT_device_address_binding_report, "
+              "so a device fault will not be traced to an object");
+  });
+  return false;
 }
 void address_log_note(bool bind, std::uint64_t base, std::uint64_t size, int type, std::uint64_t handle,
                       unsigned flags) {
