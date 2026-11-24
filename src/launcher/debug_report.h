@@ -29,8 +29,9 @@ struct DebugReport {
 // The home folder, user and computer names, account details and anything
 // shaped like a token are removed; credentials and crash dumps are never read.
 fs::path write_debug_report(const DebugReport &request);
-// Uploads a written report to dpaste.com as an unlisted paste that expires
-// after 90 days and returns its link. Throws when it cannot.
+// Uploads a written report to the PrivateBin server as an encrypted paste that
+// expires after 30 days and returns its link (the key is only in the link).
+// Throws when it cannot.
 std::string upload_debug_report(const fs::path &file, std::stop_token stop = {});
 // Exposed for tests.
 std::string redact(std::string text, const std::vector<std::string> &private_text);

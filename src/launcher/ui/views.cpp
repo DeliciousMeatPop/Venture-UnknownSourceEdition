@@ -3965,7 +3965,7 @@ void App::draw_report() {
                               "instead.", report_->error, paths::utf8(report_->file.filename())));
     else
       dialog_text("Debug report uploaded",
-                  "Put this link in a GitHub issue or our Discord with what happened. It stays readable for 90 days.");
+                  "Put this link in a GitHub issue or our Discord with what happened. It stays readable for 30 days.");
     // The link, or the upload in progress, in a field-like box.
     if (!failed) {
       gap(16);

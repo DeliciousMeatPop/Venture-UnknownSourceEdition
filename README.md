@@ -89,7 +89,7 @@ for streaming tools that key a color can be chosen instead. It is on by default;
 
 ### Something wrong?
 
-If a game crashes, click **Report issue** on the banner that appears. Otherwise, use **Upload debug report** in Settings. Either way, Venture collects the launcher and game logs from your last launch into one debug report, uploads it as an unlisted paste that expires after 90 days, and gives you a link to copy. If the upload fails, attach the report file instead (**Show file**). The report starts with what happened in the last run and its likely cause; `venture-cli report [GAME] --upload` writes the same from a terminal.
+If a game crashes, click **Report issue** on the banner that appears. Otherwise, use **Upload debug report** in Settings. Either way, Venture collects the launcher and game logs from your last launch into one debug report, uploads it as an encrypted paste on a PrivateBin server (the key stays in the link, so only people you give it to can read it) that expires after 30 days, and gives you a link to copy. If the upload fails, attach the report file instead (**Show file**). The report starts with what happened in the last run and its likely cause; `venture-cli report [GAME] --upload` writes the same from a terminal.
 
 [Open an issue](https://github.com/DeliciousMeatPop/Venture-UnknownSourceEdition/issues/new/choose) with the game, what happened, how to make it happen again and the debug report link. To watch a game's output live, turn on **Show runtime console** in Settings. Problems that also happen in upstream Venture are best reported [upstream](https://github.com/Villagers654/Venture/issues).
 
