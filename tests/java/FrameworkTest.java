@@ -2194,6 +2194,16 @@ public final class FrameworkTest {
         && micPackages.checkPermission("android.permission.RECORD_AUDIO", "other.package") == -1
         && micPackages.checkPermission("android.permission.CAMERA", "test.mic") == -1,
         "the permission dialog grants the microphone, not the camera");
+    var storageManifest = manifestNode("manifest", "package", "test.storage");
+    storageManifest.children.add(manifestNode("uses-permission", "name", "android.permission.WRITE_EXTERNAL_STORAGE"));
+    storageManifest.children.add(manifestNode("application"));
+    var storagePackages = new android.content.pm.PackageManager(new PackageModel(storageManifest));
+    check(storagePackages.checkPermission("android.permission.READ_EXTERNAL_STORAGE", "test.storage") == 0
+        && storagePackages.checkPermission("android.permission.WRITE_EXTERNAL_STORAGE", "test.storage") == 0
+        && storagePackages.checkPermission("android.permission.READ_EXTERNAL_STORAGE", "other.package") == -1,
+        "declaring WRITE_EXTERNAL_STORAGE also grants READ_EXTERNAL_STORAGE");
+    check(new android.content.pm.PackageManager(micModel).checkPermission("android.permission.READ_EXTERNAL_STORAGE", "test.mic") == -1,
+        "READ_EXTERNAL_STORAGE is not implied without WRITE_EXTERNAL_STORAGE");
     var undeclaredMic = new PackageModel(manifest);
     undeclaredMic.info.applicationInfo.targetSdkVersion = 32;
     com.venture.runtime.RuntimePermissions.request(undeclaredMic, new String[] {"android.permission.RECORD_AUDIO"});
