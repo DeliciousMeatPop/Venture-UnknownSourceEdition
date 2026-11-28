@@ -1,6 +1,13 @@
 name: Bug report
 description: A game that doesn't start, crashes, looks wrong or plays badly.
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please read before filing.** This is the *Unknown Source Edition* fork. It adds a per-app **dev identity** (a local developer account, with no Meta entitlement check) so apps from other stores can run, and a few small fixes on top of upstream Venture.
+
+        - If your problem happens with the **dev identity off**, it is most likely an upstream Venture problem and belongs at https://github.com/Villagers654/Venture/issues.
+        - **Issues without logs will be closed without comment.**
   - type: input
     id: game
     attributes:
@@ -8,6 +15,27 @@ body:
       placeholder: e.g. Beat Saber
     validations:
       required: true
+  - type: dropdown
+    id: dev-identity
+    attributes:
+      label: Was the dev identity on for this game?
+      description: >-
+        On the game's page the dev identity shows as a badge, and the report says "DEV IDENTITY active".
+        If you're not sure, say so below.
+      options:
+        - "Yes, dev identity was on"
+        - "No, it was off"
+        - "I'm not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: why-fork
+    attributes:
+      label: If it was off, why do you think this is a fork issue?
+      description: >-
+        Skip this if the dev identity was on. If it was off, the problem is probably upstream and belongs on the
+        upstream repo. If you still think it's this fork, say why: for example, it works in upstream Venture but
+        not here, or it only started after updating to this edition.
   - type: textarea
     id: what-happened
     attributes:
@@ -30,7 +58,19 @@ body:
       label: Debug report
       description: >-
         Make the problem happen, then click Report issue on the game's error, or Settings › Troubleshooting ›
-        Upload debug report, and paste the link here.
-      placeholder: https://dpaste.com/...
+        Upload debug report, and paste the link here. It already includes the launcher log and the game's last
+        runtime and console logs.
+      placeholder: https://privatebin.etisbew.website/?...
     validations:
       required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Extra logs
+      description: |
+        The debug report covers most problems. Attach more if you have them, **right after the problem happens**, because the next launch overwrites them:
+        - **Crash, black screen or hang:** the game's runtime log and console log (the debug report's "Show file" opens the folder).
+        - **Won't install, sign-in or download problems:** the launcher log.
+        - **Wrong controls or tracking:** the report's settings section is enough, plus what you pressed.
+        - **GPU crash or a VR runtime crash:** your GPU, driver version and which VR runtime you use (SteamVR, Virtual Desktop, Oculus, ...).
+        You can drag files into this box, or paste a link.
